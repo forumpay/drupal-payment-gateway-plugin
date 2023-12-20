@@ -1,0 +1,14 @@
+commerce_forumpay.apicall:
+  path: '/forumpay-api'
+  defaults:
+    _controller: '\Drupal\commerce_forumpay\Controller\ForumpayController::ApiCall'
+  requirements:
+    _permission: 'access content'
+  methods: [ POST ]
+
+commerce_forumpay.pay:
+  path: '/forumpay'
+  defaults:
+    _controller: '\Drupal\commerce_forumpay\Controller\ForumpayController::PayForm'
+  requirements:
+    _permission: 'access content'

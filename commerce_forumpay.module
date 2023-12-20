@@ -1,0 +1,40 @@
+<?php
+
+use Drupal\field\Entity\FieldStorageConfig;
+use Drupal\field\Entity\FieldConfig;
+use Drupal\commerce_order\Entity\Order;
+use Drupal\commerce_order\Entity\OrderType;
+
+/**
+ * Implements hook_install().
+ */
+function commerce_forumpay_install()
+{
+
+    // Create the field storage, if it doesn't already exist.
+    $field_storage_name = 'commerce_forumpay_metadata';
+    $field_storage = FieldStorageConfig::loadByName('commerce_order', $field_storage_name);
+    if (!$field_storage) {
+        $field_storage = FieldStorageConfig::create([
+            'field_name' => $field_storage_name,
+            'entity_type' => 'commerce_order',
+            'type' => 'text_long',
+        ]);
+        $field_storage->save();
+    }
+
+    // Create a field instance for each order type.
+    $order_types = OrderType::loadMultiple();
+    foreach ($order_types as $order_type) {
+        $instance_id = 'commerce_order.' . $order_type->id() . '.' . $field_storage_name;
+        $field_instance = FieldConfig::load($instance_id);
+        if (!$field_instance) {
+            $field_instance = FieldConfig::create([
+                'field_storage' => $field_storage,
+                'bundle' => $order_type->id(),
+                'label' => 'ForumPay transactions',
+            ]);
+            $field_instance->save();
+        }
+    }
+}

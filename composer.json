@@ -1,0 +1,20 @@
+{
+  "name": "forumpay/drupal-9-payment-gateway-plugin",
+  "description": "ForumPay Commerce plugin for Drupal",
+  "type": "drupal-module",
+  "version": "1.0.0",
+  "keywords": [
+    "payment",
+    "gateway"
+  ],
+  "require": {
+    "php": ">=7.4",
+    "forumpay/payment-gateway-php-client": "^v1.1.1",
+    "psr/log":"^1.1.4"
+  },
+  "autoload": {
+    "psr-4": {
+      "Drupal\\commerce_forumpay\\": "src/"
+    }
+  }
+}

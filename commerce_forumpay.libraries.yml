@@ -1,0 +1,7 @@
+payform:
+  version: VERSION
+  js:
+    js/forumpay.js: { }
+  css:
+    theme:
+      css/forumpay.css: { }
