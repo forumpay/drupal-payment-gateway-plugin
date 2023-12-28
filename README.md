@@ -1,4 +1,4 @@
-# Drupal9 ForumPay payment module
+# Drupal 9 ForumPay payment module
 # Installation guide
 
 ## Requirements
@@ -30,22 +30,30 @@ From the **Plugin section**, select **ForumPay Payment** and fill in the rest of
 ### Configuration details:
 
 1. **Display name**
-   The label of the payment method that is displayed when your customer is prompted to choose one.
-   You can leave default or set it to something like *Pay with crypto*.
-2. **POS ID**
-   Identifier for payments from this webshop to be identified in your ForumPay dashboard.
-   Must be a unique string. E.g.: drupal9
-3. **API User**
-   Unique ForumPay API-key identifier that you have to generate in the Forumpay dashboard.
-   It can be found in your **Profile** section.
+   The label of the payment method that is displayed when user is prompted to choose one. You can leave default or set it to something like *Pay with crypto*.
+2  **Environment**
+   Dropdown lets you switch between 'Production' and 'Sandbox' modes.
+   Use 'Production' for processing real transactions in a live environment and
+   'Sandbox' for safe testing without financial implications.
+3  **API User**
+   This is our identifier that we need to access the payment system.
+   It can be found in your **Profile**.
    [Go to profile >](https://dashboard.forumpay.com/pay/userPaymentGateway.api_settings)
 4. **API Secret**
-   *Important:* never share it to anyone!
-   API Secret consists of two parts. When generated in [ForumPay dashboard](https://dashboard.forumpay.com/pay/userPaymentGateway.api_settings), the first one will be displayed in your profile, while the second part will be sent to your e-mail. You need to enter both parts here (one after the other).
-5. **Success Order Status**
-   Is a configured status assigned to an order after customer successfully completes the purchase using ForumPay.
-6. **Custom environment URL**
-   URL to the api server. This value will override default environment.
+   _Important:_ never share it to anyone!
+   Think of it as a password.
+   API Secret consists of two parts. When generated in [ForumPay dashboard](https://dashboard.forumpay.com/pay/userPaymentGateway.api_settings),
+   the first one will be displayed in your profile, while the second part will be sent to your e-mail.
+   You need to enter both parts here (one after the other).
+5. **POS ID**
+   This is how payments coming to your wallets are going to be identified.
+   Special characters are not allowed. Allowed characters are: `[A-Za-z0-9._-]` (e.g. `my-shop`, `my_shop`).
+6. **Success Order Status**
+   Which status the order gets once user successfully completes the payment.
+7. **Custom environment URL**
+   Optional: URL to the API server. This value will override the default setting. Only used for debugging.
+8  **Accept Instant (Zero) Confirmations**
+   Allows immediate transaction approval without waiting for network confirmations, enhancing speed but with increased risk.
 
 Don't forget to click *Save* button after the settings are filled in.
 

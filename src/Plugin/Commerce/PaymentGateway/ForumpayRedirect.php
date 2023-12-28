@@ -58,14 +58,6 @@ class ForumpayRedirect extends OffsitePaymentGatewayBase
         $api_url_override = $this->configuration['api_url_override'] ?? '';
         $accept_zero_confirmations = boolval($this->configuration['accept_zero_confirmations']);
 
-        $form['pos_id'] = [
-            '#type' => 'textfield',
-            '#title' => $this->t('POS ID'),
-            '#default_value' => $pos_id,
-            '#description' => $this->t('Enter your webshop identifier (POS ID). Special characters not allowed. Allowed are: [A-Za-z0-9._-] Eg drupal-3'),
-            '#required' => true,
-        ];
-
         $form['api_url'] = [
             '#type' => 'select',
             '#title' => $this->t('Environment'),
@@ -96,6 +88,14 @@ class ForumpayRedirect extends OffsitePaymentGatewayBase
             '#always_empty' => false,
         ];
 
+        $form['pos_id'] = [
+            '#type' => 'textfield',
+            '#title' => $this->t('POS ID'),
+            '#default_value' => $pos_id,
+            '#description' => $this->t('Enter your webshop identifier (POS ID). Special characters not allowed. Allowed are: [A-Za-z0-9._-] Eg drupal-3'),
+            '#required' => true,
+        ];
+
         $form['success_order_state'] = [
             '#type' => 'textfield',
             '#title' => $this->t('Success Order Status'),
@@ -108,7 +108,7 @@ class ForumpayRedirect extends OffsitePaymentGatewayBase
             '#type' => 'textfield',
             '#title' => $this->t('Custom environment URL'),
             '#default_value' => $api_url_override,
-            '#description' => $this->t('URL to the api server. This value will override default environment.'),
+            '#description' => $this->t('Optional: URL to the API server. This value will override the default setting. Only used for debugging.'),
             '#required' => false,
         ];
 
