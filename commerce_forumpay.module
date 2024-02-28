@@ -10,7 +10,6 @@ use Drupal\commerce_order\Entity\OrderType;
  */
 function commerce_forumpay_install()
 {
-
     // Create the field storage, if it doesn't already exist.
     $field_storage_name = 'commerce_forumpay_metadata';
     $field_storage = FieldStorageConfig::loadByName('commerce_order', $field_storage_name);

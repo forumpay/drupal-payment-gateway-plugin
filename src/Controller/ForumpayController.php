@@ -66,7 +66,7 @@ class ForumpayController extends ControllerBase
         $forumPayLogger->addParser(new PrivateTokenMasker());
 
         $request = new \Drupal\commerce_forumpay\Request();
-        $orderId = $request->getRequired('orderId');
+        $orderId = $request->get('orderId') ?? $request->getRequired('reference_no');
         $order = Order::load($orderId);
         $paymentGateway = $order->payment_gateway->entity;
         $config = new Config($paymentGateway->get('configuration'));

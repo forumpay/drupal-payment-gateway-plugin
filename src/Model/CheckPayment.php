@@ -50,7 +50,7 @@ class CheckPayment
             try {
                 $orderId = $request->getRequired('orderId');
             } catch (\InvalidArgumentException $e) {
-                $this->logger->error($e->getMessage(), $e->getTrace());
+                $this->logger->error($e->getMessage(), ForumPayLogger::exceptionToContext($e));
                 throw new OrderNotFoundException(4005);
             }
             $paymentId = $request->getRequired('payment_id');
@@ -100,16 +100,15 @@ class CheckPayment
             );
 
             $this->logger->info('CheckPayment entrypoint finished.');
-
             return $paymentDetails;
         } catch (TransactionDetailsMissingException $e) {
-            $this->logger->error($e->getMessage(), $e->getTrace());
+            $this->logger->error($e->getMessage(), ForumPayLogger::exceptionToContext($e));
             throw new TransactionDetailsMissingException($e->getMessage(), 4006, $e);
         } catch (ApiExceptionInterface $e) {
             $this->logger->logApiException($e);
             throw new ApiHttpException($e, 4050);
         } catch (\Exception $e) {
-            $this->logger->critical($e->getMessage(), $e->getTrace());
+            $this->logger->critical($e->getMessage(), ForumPayLogger::exceptionToContext($e));
             throw new \Exception($e->getMessage(), 4100, $e);
         }
     }

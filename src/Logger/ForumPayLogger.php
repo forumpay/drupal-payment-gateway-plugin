@@ -31,6 +31,15 @@ class ForumPayLogger implements LoggerInterface
      */
     private array $parsers;
 
+    public static function exceptionToContext(\Exception $e) {
+        return [
+            'error' => $e->getMessage(),
+            'file' => $e->getFile(),
+            'line' => $e->getLine(),
+            'trace' => $e->getTraceAsString(), // Convert the trace to a string
+        ];
+    }
+
     /**
      * Constructor
      *
@@ -59,73 +68,82 @@ class ForumPayLogger implements LoggerInterface
     /**
      * @inheritdoc
      */
-    public function emergency($message, array $context = [])
+    public function emergency($message, array $context = []): void
     {
-        $this->logger->emergency($this->formatLogMessage($message), $this->parseContext($context));
+        $parsedContext = $this->parseContext($context);
+        $this->logger->emergency($this->formatLogMessage($message, $parsedContext), $parsedContext);
     }
 
     /**
      * @inheritdoc
      */
-    public function alert($message, array $context = [])
+    public function alert($message, array $context = []): void
     {
-        $this->logger->alert($this->formatLogMessage($message), $this->parseContext($context));
+        $parsedContext = $this->parseContext($context);
+        $this->logger->alert($this->formatLogMessage($message, $parsedContext), $parsedContext);
     }
 
     /**
      * @inheritdoc
      */
-    public function critical($message, array $context = [])
+    public function critical($message, array $context = []): void
     {
-        $this->logger->critical($this->formatLogMessage($message), $this->parseContext($context));
+        $parsedContext = $this->parseContext($context);
+        $this->logger->critical($this->formatLogMessage($message, $parsedContext), $parsedContext);
     }
 
     /**
      * @inheritdoc
      */
-    public function error($message, array $context = [])
+    public function error($message, array $context = []): void
     {
-        $this->logger->error($this->formatLogMessage($message), $this->parseContext($context));
+        $parsedContext = $this->parseContext($context);
+        $this->logger->error($this->formatLogMessage($message, $parsedContext), $parsedContext);
     }
 
     /**
      * @inheritdoc
      */
-    public function warning($message, array $context = [])
+    public function warning($message, array $context = []): void
     {
-        $this->logger->warning($this->formatLogMessage($message), $this->parseContext($context));
+        $parsedContext = $this->parseContext($context);
+        $this->logger->warning($this->formatLogMessage($message, $parsedContext), $parsedContext);
     }
 
     /**
      * @inheritdoc
      */
-    public function notice($message, array $context = [])
+    public function notice($message, array $context = []): void
     {
-        $this->logger->notice($this->formatLogMessage($message), $this->parseContext($context));
+        $parsedContext = $this->parseContext($context);
+        $this->logger->notice($this->formatLogMessage($message, $parsedContext), $parsedContext);
     }
 
     /**
      * @inheritdoc
      */
-    public function info($message, array $context = [])
+    public function info($message, array $context = []): void
     {
-        $this->logger->info($this->formatLogMessage($message), $this->parseContext($context));
+        $parsedContext = $this->parseContext($context);
+        $this->logger->info($this->formatLogMessage($message, $parsedContext), $parsedContext);
     }
 
     /**
      * @inheritdoc
      */
-    public function debug($message, array $context = [])
+    public function debug($message, array $context = []): void
     {
-        $this->logger->debug($this->formatLogMessage($message), $this->parseContext($context));
+        $parsedContext = $this->parseContext($context);
+        $this->logger->debug($this->formatLogMessage($message, $parsedContext), $parsedContext);
     }
 
     /**
      * @inheritdoc
      */
-    public function log($level, $message, array $context = [])
+    public function log($level, $message, array $context = []): void
     {
-        $this->logger->log($level, $this->formatLogMessage($message), $this->parseContext($context));
+        $parsedContext = $this->parseContext($context);
+        $this->logger->log($level, $this->formatLogMessage($message, $parsedContext), $parsedContext);
     }
 
     /**
@@ -141,7 +159,10 @@ class ForumPayLogger implements LoggerInterface
             case ($e instanceof ApiErrorException || $e instanceof InvalidResponseJsonException):
                 $this->logger->error(
                     $this->formatApiExceptionMessage($e, $exceptionClass),
-                    ['parameters' => $e->getCallParameters(), 'trace' => $e->getTrace()]
+                    [
+                        'parameters' => $e->getCallParameters(),
+                        'trace' => $e->getTraceAsString()
+                    ]
                 );
                 break;
 
@@ -151,7 +172,7 @@ class ForumPayLogger implements LoggerInterface
                     [
                         'curlInfo' => $e->getCurlInfo(),
                         'parameters' => $e->getCallParameters(),
-                        'trace' => $e->getTrace()
+                        'trace' => $e->getTraceAsString()
                     ]
                 );
                 break;
@@ -162,7 +183,7 @@ class ForumPayLogger implements LoggerInterface
                     [
                         'response' => $e->getResponse(),
                         'parameters' => $e->getCallParameters(),
-                        'trace' => $e->getTrace()
+                        'trace' => $e->getTraceAsString()
                     ]
                 );
                 break;
@@ -170,7 +191,10 @@ class ForumPayLogger implements LoggerInterface
             case ($e instanceof InvalidResponseStatusCodeException):
                 $this->logger->error(
                     $this->formatInvalidResponseStatusCodeExceptionMessage($e, $exceptionClass),
-                    ['parameters' => $e->getCallParameters(), 'trace' => $e->getTrace()]
+                    [
+                        'parameters' => $e->getCallParameters(),
+                        'trace' => $e->getTraceAsString()
+                    ]
                 );
                 break;
         }
@@ -240,11 +264,12 @@ class ForumPayLogger implements LoggerInterface
      * Return default formatted message
      *
      * @param string $message
+     * @param array $context
      * @return string
      */
-    private function formatLogMessage(string $message): string
+    private function formatLogMessage(string $message, array $context = []): string
     {
-        return sprintf('%s - %s', $this->prefix, $message);
+        return sprintf('%s - %s [%s]', $this->prefix, $message, json_encode($context));
     }
 
     /**

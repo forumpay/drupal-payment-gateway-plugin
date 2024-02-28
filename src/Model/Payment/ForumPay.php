@@ -300,7 +300,6 @@ class ForumPay
     {
         $startPaymentResponses = $this->orderManager->getOrderMetaData($orderId, 'startPayment');
 
-        /** @var WC_Meta_Data $response */
         foreach ($startPaymentResponses as $response) {
             if ($response['payment_id'] === $paymentId) {
                 return $response;

@@ -1,9 +1,9 @@
-# Drupal 9 ForumPay payment module
+# ForumPay Crypto Payments for Drupal 9 and 10
 # Installation guide
 
 ## Requirements
 
-> Make sure you have at least Drupal Version 9.4 and Drupal Commerce 2.2 or higher.
+> Make sure you have at least Drupal Commerce 2.2 or higher. Both Drupal version 9 and Drupal version 10 are supported.
 > Install using the composer
 
 ## Installation using composer
@@ -31,11 +31,11 @@ From the **Plugin section**, select **ForumPay Payment** and fill in the rest of
 
 1. **Display name**
    The label of the payment method that is displayed when user is prompted to choose one. You can leave default or set it to something like *Pay with crypto*.
-2  **Environment**
+2.  **Environment**
    Dropdown lets you switch between 'Production' and 'Sandbox' modes.
    Use 'Production' for processing real transactions in a live environment and
    'Sandbox' for safe testing without financial implications.
-3  **API User**
+3.  **API User**
    This is our identifier that we need to access the payment system.
    It can be found in your **Profile**.
    [Go to profile >](https://dashboard.forumpay.com/pay/userPaymentGateway.api_settings)
@@ -52,7 +52,7 @@ From the **Plugin section**, select **ForumPay Payment** and fill in the rest of
    Which status the order gets once user successfully completes the payment.
 7. **Custom environment URL**
    Optional: URL to the API server. This value will override the default setting. Only used for debugging.
-8  **Accept Instant (Zero) Confirmations**
+8.  **Accept Instant (Zero) Confirmations**
    Allows immediate transaction approval without waiting for network confirmations, enhancing speed but with increased risk.
 
 Don't forget to click *Save* button after the settings are filled in.

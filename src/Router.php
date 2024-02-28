@@ -81,7 +81,7 @@ class Router
         if (array_key_exists($route, $this->routes)) {
             $service = $this->routes[$route];
             $response = $service->execute($request);
-            return $response->toArray();
+            return $response ? $response->toArray() : [];
         }
 
         throw \Exception(sprintf("Action %s, not found"), $route);

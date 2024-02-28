@@ -48,7 +48,7 @@ class GetCurrencyRate
             try {
                 $orderId = $request->getRequired('orderId');
             } catch (\InvalidArgumentException $e) {
-                $this->logger->error($e->getMessage(), $e->getTrace());
+                $this->logger->error($e->getMessage(), ForumPayLogger::exceptionToContext($e));
                 throw new OrderNotFoundException(2005);
             }
 
@@ -80,7 +80,7 @@ class GetCurrencyRate
             $this->logger->logApiException($e);
             throw new ApiHttpException($e, 2050);
         } catch (\Exception $e) {
-            $this->logger->critical($e->getMessage(), $e->getTrace());
+            $this->logger->critical($e->getMessage(), ForumPayLogger::exceptionToContext($e));
             throw new \Exception($e->getMessage(), 2100, $e);
         }
     }

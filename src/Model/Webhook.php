@@ -52,7 +52,7 @@ class Webhook
                 $paymentId = $request->getRequired('payment_id');
                 $orderId = $request->getRequired('reference_no');
             } catch (\InvalidArgumentException $e) {
-                $this->logger->error($e->getMessage(), $e->getTrace());
+                $this->logger->error($e->getMessage(), ForumPayLogger::exceptionToContext($e));
                 throw new ForumPayException($e->getMessage(),6005, $e);
             }
 
@@ -66,7 +66,7 @@ class Webhook
             $this->logger->logApiException($e);
             throw new ApiHttpException($e, 6050);
         } catch (\Exception $e) {
-            $this->logger->critical($e->getMessage(), $e->getTrace());
+            $this->logger->critical($e->getMessage(), ForumPayLogger::exceptionToContext($e));
             throw new \Exception($e->getMessage(), 6100, $e);
         }
     }

@@ -12,14 +12,14 @@ class Request
     /**
      * Return expected parameter for Request, throw \InvalidArgumentException otherwise.
      *
-     * @param $param
+     * @param $paramName
      * @return mixed
      */
-    public function getRequired($param)
+    public function getRequired($paramName)
     {
-        $param = $this->get($param, null);
+        $param = $this->get($paramName, null);
         if ($param === null) {
-            throw new \InvalidArgumentException(sprintf('Missing required parameter %s', $param));
+            throw new \InvalidArgumentException(sprintf('Missing required parameter %s', $paramName));
         }
 
         return $param;
