@@ -33,7 +33,7 @@ class Config
         if ($moduleHandler->moduleExists(self::MODULE_NAME)) {
             $extensionList = \Drupal::service('extension.list.module');
             $module = $extensionList->getExtensionInfo(self::MODULE_NAME);
-            return $module['version'];
+            return $module['version'] ?? '0';
         }
         return '';
     }
@@ -146,6 +146,117 @@ class Config
     }
 
     /**
+     * Returns url to Webhook api depending.
+     *
+     * @return string
+     */
+    public function getWebhookUrl(): string
+    {
+        return $this->configData['webhook_url'];
+    }
+
+    /**
+     * If set to true, confirms to automatically accept payments that are less than the total order amount
+     *
+     * @return bool
+     */
+    public function getAcceptUnderpayment(): bool
+    {
+        return $this->configData['accept_underpayment_main'];
+    }
+
+    /**
+     * Returns maximum percentage of the order total that can be underpaid
+     *
+     * @return int|string
+     */
+    public function getAcceptUnderpaymentThreshold(): int|string
+    {
+        return $this->configData['accept_underpayment_threshold'] ?: '';
+    }
+
+    /**
+     * If set to true, returns modified order total with underpayments as a separate and negative fee
+     *
+     * @return bool
+     */
+    public function getAcceptUnderpaymentModifyOrderTotal(): bool
+    {
+        return $this->configData['accept_underpayment_modify_order_total'];
+    }
+
+    /**
+     * Returns a description for the underpayment fee
+     *
+     * @return string
+     */
+    public function getAcceptUnderpaymentModifyOrderTotalDescription(): string
+    {
+        return $this->configData['accept_underpayment_modify_order_total_description'];
+    }
+
+    /**
+     * If set to true, confirms to automatically accept payments that exceed the total order amount
+     *
+     * @return bool
+     */
+    public function getAcceptOverpayment(): bool
+    {
+        return $this->configData['accept_overpayment_main'];
+    }
+
+    /**
+     * Returns maximum percentage of the order total that can be overpaid
+     *
+     * @return int|string
+     */
+    public function getAcceptOverpaymentThreshold(): int|string
+    {
+        return $this->configData['accept_overpayment_threshold'] ?: '';
+    }
+
+    /**
+     * If set to true, returns modified order total with overpayments as a separate and positive fee
+     *
+     * @return bool
+     */
+    public function getAcceptOverpaymentModifyOrderTotal(): bool
+    {
+        return $this->configData['accept_overpayment_modify_order_total'];
+    }
+
+    /**
+     * Returns a description for the overpayment fee
+     *
+     * @return string
+     */
+    public function getAcceptOverpaymentModifyOrderTotalDescription(): string
+    {
+        return $this->configData['accept_overpayment_modify_order_total_description'];
+    }
+
+    /**
+     * If set to true, confirms to automatically accept the payment if transaction was received late and either the paid
+     * amount is similar to requested or accepting it is allowed by the other Auto-Accept conditions
+     *
+     * @return bool
+     */
+    public function getAcceptLatePayment(): bool
+    {
+        return $this->configData['accept_latepayment'];
+    }
+
+    /**
+     * Returns who pays the network processing fee ('payer' or 'merchant')
+     *
+     * @return string
+     */
+    public function getNetworkProcessingFeePaidBy(): string
+    {
+        return $this->configData['network_processing_fee_paid_by'] ?? 'payer';
+    }
+
+    /**
      * Returns custom instructions that should be visible to customer.
      *
      * @return mixed
@@ -166,4 +277,12 @@ class Config
         return $currentLanguage->getId();
     }
 
+    /**
+     * @return string|null
+     */
+    public function getInstallationId(): ?string
+    {
+        $config = \Drupal::configFactory()->getEditable('forumpay.settings');
+        return $config->get('installation_id') ?? '';
+    }
 }

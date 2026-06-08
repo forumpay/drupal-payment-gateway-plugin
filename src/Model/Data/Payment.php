@@ -2,6 +2,7 @@
 
 namespace Drupal\commerce_forumpay\Model\Data;
 
+use Drupal\commerce_forumpay\Model\Data\Payment\BeneficiaryVaspDetails;
 use Drupal\commerce_forumpay\Model\Data\Payment\Notice;
 
 /**
@@ -87,6 +88,44 @@ class Payment
     private array $notices;
 
     /**
+     * @var string
+     */
+    private string $statsToken;
+
+    /**
+     * @var BeneficiaryVaspDetails|null
+     */
+    private ?BeneficiaryVaspDetails $beneficiaryVaspDetails;
+
+    /**
+     * Item name being purchased
+     *
+     * @var string|null
+     */
+    private ?string $itemName;
+
+    /**
+     * Processing fee/surcharge amount
+     *
+     * @var string|null
+     */
+    private ?string $invoiceSurchargeAmount;
+
+    /**
+     * Total invoice amount including surcharge
+     *
+     * @var string|null
+     */
+    private ?string $invoiceAmountWithSurcharge;
+
+    /**
+     * Surcharge percentage
+     *
+     * @var string|null
+     */
+    private ?string $invoiceSurchargePercent;
+
+    /**
      * Payment DTO constructor
      *
      * @param string $paymentId
@@ -100,6 +139,12 @@ class Payment
      * @param string $qrImg
      * @param string $qrAltImg
      * @param array $notices
+     * @param string $statsToken
+     * @param BeneficiaryVaspDetails|null $beneficiaryVaspDetails
+     * @param string|null $itemName
+     * @param string|null $invoiceSurchargeAmount
+     * @param string|null $invoiceAmountWithSurcharge
+     * @param string|null $invoiceSurchargePercent
      */
     public function __construct(
         string $paymentId,
@@ -112,7 +157,13 @@ class Payment
         string $qrAlt,
         string $qrImg,
         string $qrAltImg,
-        array $notices = []
+        array $notices = [],
+        string $statsToken = '',
+        ?BeneficiaryVaspDetails $beneficiaryVaspDetails = null,
+        ?string $itemName = null,
+        ?string $invoiceSurchargeAmount = null,
+        ?string $invoiceAmountWithSurcharge = null,
+        ?string $invoiceSurchargePercent = null
     ) {
         $this->paymentId = $paymentId;
         $this->address = $address;
@@ -125,6 +176,12 @@ class Payment
         $this->qrImg = $qrImg;
         $this->qrAltImg = $qrAltImg;
         $this->notices = $notices;
+        $this->statsToken = $statsToken;
+        $this->beneficiaryVaspDetails = $beneficiaryVaspDetails;
+        $this->itemName = $itemName;
+        $this->invoiceSurchargeAmount = $invoiceSurchargeAmount;
+        $this->invoiceAmountWithSurcharge = $invoiceAmountWithSurcharge;
+        $this->invoiceSurchargePercent = $invoiceSurchargePercent;
     }
 
     /**
@@ -216,6 +273,54 @@ class Payment
     }
 
     /**
+     * @return string
+     */
+    public function getStatsToken(): string
+    {
+        return $this->statsToken;
+    }
+
+    /**
+     * @return BeneficiaryVaspDetails|null
+     */
+    public function getBeneficiaryVaspDetails(): ?BeneficiaryVaspDetails
+    {
+        return $this->beneficiaryVaspDetails;
+    }
+
+    /**
+     * @return string|null
+     */
+    public function getItemName(): ?string
+    {
+        return $this->itemName;
+    }
+
+    /**
+     * @return string|null
+     */
+    public function getInvoiceSurchargeAmount(): ?string
+    {
+        return $this->invoiceSurchargeAmount;
+    }
+
+    /**
+     * @return string|null
+     */
+    public function getInvoiceAmountWithSurcharge(): ?string
+    {
+        return $this->invoiceAmountWithSurcharge;
+    }
+
+    /**
+     * @return string|null
+     */
+    public function getInvoiceSurchargePercent(): ?string
+    {
+        return $this->invoiceSurchargePercent;
+    }
+
+    /**
      * Return associative array of all the properties
      *
      * @return array
@@ -237,6 +342,12 @@ class Payment
                 $this->notices
             ),
             'payment_id' => $this->paymentId,
+            'stats_token' => $this->statsToken,
+            'beneficiary_vasp_details' => $this->beneficiaryVaspDetails?->toArray(),
+            'item_name' => $this->itemName,
+            'invoice_surcharge_amount' => $this->invoiceSurchargeAmount,
+            'invoice_amount_with_surcharge' => $this->invoiceAmountWithSurcharge,
+            'invoice_surcharge_percent' => $this->invoiceSurchargePercent,
         ];
     }
 }

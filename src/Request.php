@@ -37,6 +37,9 @@ class Request
         $params = $this->getAllParams();
 
         if (isset($params[$param])) {
+            if (is_array($params[$param])) {
+                return array_map([Html::class, 'escape'], $params[$param]);
+            }
             return Html::escape($params[$param]);
         }
 

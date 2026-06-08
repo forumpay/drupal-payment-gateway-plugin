@@ -8,6 +8,7 @@ use Drupal\commerce_forumpay\Exception\TransactionDetailsMissingException;
 use Drupal\commerce_forumpay\Logger\ForumPayLogger;
 use Drupal\commerce_forumpay\Model\Data\PaymentDetails;
 use Drupal\commerce_forumpay\Request;
+use Drupal\commerce_order\Entity\Order;
 use ForumPay\PaymentGateway\PHPClient\Http\Exception\ApiExceptionInterface;
 use ForumPay\PaymentGateway\PHPClient\Response\CheckPaymentResponse;
 use Drupal\commerce_forumpay\Model\Payment\ForumPay;
@@ -56,8 +57,14 @@ class CheckPayment
             $paymentId = $request->getRequired('payment_id');
             $this->logger->info('CheckPayment entrypoint called.', ['paymentId' => $paymentId]);
 
+            $orderBefore = Order::load($orderId);
+            $stateBefore = $orderBefore ? $orderBefore->getState()->getId() : null;
+
             /** @var CheckPaymentResponse $response */
             $response = $this->forumPay->checkPayment($orderId, $paymentId);
+
+            $orderAfter = Order::load($orderId);
+            $stateAfter = $orderAfter ? $orderAfter->getState()->getId() : null;
 
             if ($response->getUnderpayment()) {
                 $underPayment = new Underpayment(
@@ -78,6 +85,7 @@ class CheckPayment
                 $response->getType(),
                 $response->getInvoiceCurrency(),
                 $response->getAmount(),
+                $response->getOriginalAmount(),
                 $response->getMinConfirmations(),
                 $response->isAcceptZeroConfirmations(),
                 $response->isRequireKytForConfirmation(),
@@ -97,7 +105,13 @@ class CheckPayment
                 $response->getPrintString(),
                 $response->getState(),
                 $underPayment ?? null,
+                $response->getItemName(),
+                $response->getInvoiceSurchargeAmount(),
+                $response->getInvoiceAmountWithSurcharge(),
+                $response->getInvoiceSurchargePercent(),
             );
+
+            $paymentDetails->setOrderStatusChanged($stateBefore !== $stateAfter);
 
             $this->logger->info('CheckPayment entrypoint finished.');
             return $paymentDetails;

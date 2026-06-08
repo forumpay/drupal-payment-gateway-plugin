@@ -1,22 +1,27 @@
-# ForumPay Crypto Payments for Drupal 9 and 10
+# ForumPay Crypto Payments for Drupal 10 and 11
 # Installation guide
 
 ## Requirements
 
-> Make sure you have at least Drupal Commerce 2.2 or higher. Both Drupal version 9 and Drupal version 10 are supported.
+> Make sure you have at least Drupal Commerce 3 or higher. Both Drupal version 10 and Drupal version 11 are supported.
 > Install using the composer
 
 ## Installation using composer
 
 ```shell
-composer require forumpay/drupal-9-payment-gateway-plugin
+composer require forumpay/drupal-payment-gateway-plugin
 ```
 
 ## Upgrade from previous version
 
 ```shell
-composer update forumpay/drupal-9-payment-gateway-plugin
+composer update forumpay/drupal-payment-gateway-plugin
 ```
+When updating to new version, Drupal does not run any updates until we explicitly run them using:
+```shell
+drush updatedb
+```
+OR by visiting /update.php in browser.
 
 ## Configuration
 

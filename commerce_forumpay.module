@@ -1,5 +1,6 @@
 <?php
 
+use Drupal\Component\Uuid\Uuid;
 use Drupal\field\Entity\FieldStorageConfig;
 use Drupal\field\Entity\FieldConfig;
 use Drupal\commerce_order\Entity\Order;
@@ -34,6 +35,113 @@ function commerce_forumpay_install()
                 'label' => 'ForumPay transactions',
             ]);
             $field_instance->save();
+        }
+    }
+
+    $config = \Drupal::configFactory()->getEditable('forumpay.settings');
+    if (!$config->get('installation_id')) {
+        $installation_id = bin2hex(random_bytes(16));
+        $config->set('installation_id', $installation_id)->save();
+    }
+}
+
+/**
+ * Implements hook_commerce_order_view_alter().
+ */
+function commerce_forumpay_commerce_order_view_alter(&$build, \Drupal\commerce_order\Entity\OrderInterface $order)
+{
+    $metaData = getOrderMetaData($order, 'startPayment');
+    $responses = array_column($metaData, 'payment_id');
+    $transaction_text = !empty($responses) ? t(end($responses)) : t('N/A');
+
+    if ($order->get('payment_gateway')->entity && $order->get('payment_gateway')->entity->getPluginId() === 'forumpay') {
+        if (!isset($build['header'])) {
+            $build['header'] = ['#type' => 'container'];
+        }
+
+        $build['header']['transaction_id'] = [
+            '#type' => 'markup',
+            '#markup' => '<div><p>Payment ID:</p> <p class="order_payment_id">' . $transaction_text . '</p></div>',
+            '#weight' => -51,
+        ];
+
+        $build['header']['sync_payment'] = [
+            '#type' => 'link',
+            '#title' => t('Sync Payment'),
+            '#url' => \Drupal\Core\Url::fromRoute('<none>'),
+            '#attributes' => [
+                'class' => ['button', 'button--primary'],
+                'id' => 'forumpay-api-sync-payment',
+            ],
+            '#weight' => -50,
+        ];
+
+        $build['#attached']['library'][] = 'commerce_forumpay/sync_payment';
+    }
+}
+
+/**
+ * Fetch metadata from order
+ *
+ * @param Order $order
+ * @param string $key
+ * @return mixed
+ */
+function getOrderMetaData(Order $order, string $key)
+{
+    if ($order->hasField('commerce_forumpay_metadata')) {
+        $metaData = json_decode(
+            $order->get('commerce_forumpay_metadata')->value,
+            true
+        );
+
+        return $metaData[$key] ?? [];
+    }
+
+    return [];
+}
+
+/**
+ * Implements hook_page_top().
+ */
+function commerce_forumpay_page_top(array &$page) {
+    $current_user = \Drupal::currentUser();
+    $current_path = \Drupal::service('path.current')->getPath();
+
+    if (str_starts_with($current_path, '/admin') && $current_user->hasPermission('administer commerce_order')) {
+        $state = \Drupal::state();
+        $last_run = $state->get('commerce_forumpay.last_check_time', 0);
+        $time_now = time();
+
+        if (($time_now - $last_run) > (15 * 60)) {
+            $database = \Drupal::database();
+            $query = $database->select('commerce_order', 'o')
+                ->fields('o', ['order_id'])
+                ->condition('o.payment_gateway', 'forumpay')
+                ->condition('o.changed', $time_now - (15 * 60), '<');
+
+            $query->leftJoin('commerce_order__commerce_forumpay_metadata', 'm', 'm.entity_id = o.order_id');
+            $query->condition('m.commerce_forumpay_metadata_value', '%"startPayment"%', 'LIKE');
+
+            $query->orderBy('o.changed', 'DESC')
+                ->range(0, 1);
+
+            $orders = $query->execute()->fetchCol();
+
+            if (empty($orders)) {
+                return;
+            }
+
+            $webhookUsed = getOrderMetaData(Order::load(reset($orders)), 'payment_formumpay_webhook_used');
+
+            $state->set('commerce_forumpay.has_webhook_error', empty($webhookUsed));
+            $state->set('commerce_forumpay.last_check_time', $time_now);
+        }
+
+        if ($state->get('commerce_forumpay.has_webhook_error')) {
+            \Drupal::messenger()->addWarning(
+                t('Some orders have not received a webhook notification for more than 15 minutes. Please check your settings and ensure the webhook is configured correctly.')
+            );
         }
     }
 }

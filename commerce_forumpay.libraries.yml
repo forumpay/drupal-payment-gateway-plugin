@@ -1,7 +1,14 @@
 payform:
-  version: VERSION
   js:
+    js/forumpay_widget.js: { minified: true }
     js/forumpay.js: { }
   css:
     theme:
       css/forumpay.css: { }
+      css/forumpay_widget.css: { }
+admin_gateway_settings:
+  js:
+    js/admin_gateway_settings.js: { }
+sync_payment:
+  js:
+    js/order_edit.js: {}

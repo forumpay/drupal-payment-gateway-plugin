@@ -3,6 +3,7 @@
 namespace Drupal\commerce_forumpay\Model\Payment;
 
 use Drupal\commerce_price\Price;
+use Drupal\commerce_order\Adjustment;
 use Drupal\commerce_order\Entity\Order;
 
 /**
@@ -43,7 +44,9 @@ class OrderManager
     public function getOrderTotal($orderId)
     {
         $order = $this->getOrder($orderId);
-        return $order->getTotalPrice()->getNumber();
+        $total = $order->getTotalPrice()->getNumber();
+        // Round to 2 decimal places for API compatibility
+        return (string) round($total, 2);
     }
 
     /**
@@ -143,14 +146,50 @@ class OrderManager
      * @param $newStatus
      * @param $paymentId
      * @param $completedOrderState
+     * @param float|null $amountPaid
+     * @param string $underPayFeeDescription
+     * @param string $overPayFeeDescription
      */
-    public function updateOrderStatus($orderId, $newStatus, $paymentId, $completedOrderState)
-    {
+    public function updateOrderStatus(
+        $orderId,
+        $newStatus,
+        $paymentId,
+        $completedOrderState,
+        ?float $amountPaid = null,
+        string $underPayFeeDescription = '',
+        string $overPayFeeDescription = ''
+    ) {
         $order = $this->getOrder($orderId);
+        $orderTotal = $order->getTotalPrice()->getNumber();
+        $customFee = round($amountPaid - $orderTotal, 2);
 
-        if (strtolower($newStatus) === 'confirmed') {
+        if (strtolower($newStatus) === 'confirmed' || strtolower($newStatus) === 'processing') {
+            if ($amountPaid < $orderTotal) {
+                if (!empty($underPayFeeDescription)) {
+                    $order->addAdjustment(new Adjustment([
+                        'type' => 'fee',
+                        'label' => $underPayFeeDescription,
+                        'amount' => new Price((string) $customFee, $this->getOrderCurrency($orderId)),
+                        'included' => FALSE,
+                        'locked' => TRUE,
+                    ]));
+                    $order->save();
+                }
+            }
+            if ($amountPaid > $orderTotal) {
+                if (!empty($overPayFeeDescription)) {
+                    $order->addAdjustment(new Adjustment([
+                        'type' => 'fee',
+                        'label' => $overPayFeeDescription,
+                        'amount' => new Price((string) $customFee, $this->getOrderCurrency($orderId)),
+                        'included' => FALSE,
+                        'locked' => TRUE,
+                    ]));
+                    $order->save();
+                }
+            }
             $paymentStorage = \Drupal::entityTypeManager()->getStorage('commerce_payment');
-            $transactionArray = $paymentStorage->loadByProperties(['order_id' => $orderId]);
+            $transactionArray = $paymentStorage->loadByProperties(['order_id' => $orderId, 'remote_id' => $paymentId]);
 
             $paymentGateway = $order->payment_gateway->entity;
 
@@ -171,16 +210,21 @@ class OrderManager
             $transaction->setAmount($price);
             $paymentStorage->save($transaction);
 
+            if(!$order->getOrderNumber()) {
+                $order->set('state', 'draft');
+                $order->save();
+            }
+
             $order->set('state', $completedOrderState);
             $order->set('checkout_step', 'complete');
-            $order->set('completed', REQUEST_TIME);
-            $order->set('placed', REQUEST_TIME);
+            $order->set('completed', \Drupal::time()->getRequestTime());
+            $order->set('placed', \Drupal::time()->getRequestTime());
             $order->set('cart', false);
 
             $order->save();
             $this->saveOrderMetaData($orderId, 'payment_formumpay_paymentId', $paymentId, true);
         } else if (strtolower($newStatus) === 'cancelled') {
-            $order->set('state', 'draft');
+            $order->set('state', 'canceled');
             $order->save();
         }
     }

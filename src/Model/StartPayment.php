@@ -2,6 +2,7 @@
 
 namespace Drupal\commerce_forumpay\Model;
 
+use Drupal\commerce_forumpay\Model\Data\Payer\Payer;
 use ForumPay\PaymentGateway\PHPClient\Response\RequestKycResponse;
 use Drupal\commerce_forumpay\Exception\ApiHttpException;
 use Drupal\commerce_forumpay\Exception\OrderNotFoundException;
@@ -11,6 +12,7 @@ use Drupal\commerce_forumpay\Model\Payment\ForumPay;
 use Drupal\commerce_forumpay\Request;
 use ForumPay\PaymentGateway\PHPClient\Http\Exception\ApiExceptionInterface;
 use ForumPay\PaymentGateway\PHPClient\Response\StartPaymentResponse;
+use Drupal\commerce_forumpay\Model\Data\Payment\BeneficiaryVaspDetails;
 
 class StartPayment
 {
@@ -57,17 +59,22 @@ class StartPayment
 
         try {
             $currency = $request->getRequired('currency');
+            $payer = $request->getRequired('payer');
             $kyc = $request->get('kycPin');
+
+            $payer = Payer::valueOf($payer);
 
             $this->logger->info('StartPayment entrypoint called.', ['currency' => $currency]);
 
             /** @var StartPaymentResponse $response */
-            $response = $this->forumPay->startPayment($orderId, $currency, '', $kyc);
+            $response = $this->forumPay->startPayment($orderId, $currency, '', $kyc, $payer);
 
             $notices = [];
             foreach ($response->getNotices() as $notice) {
                 $notices[] = new Payment\Notice($notice['code'], $notice['message']);
             }
+
+            $beneficiaryVaspDetails = BeneficiaryVaspDetails::fromArray($response->getBeneficiaryVaspDetails());
 
             $payment = new Payment(
                 $response->getPaymentId(),
@@ -80,7 +87,13 @@ class StartPayment
                 $response->getQrAlt(),
                 $response->getQrImg(),
                 $response->getQrAltImg(),
-                $notices
+                $notices,
+                $response->getStatsToken(),
+                $beneficiaryVaspDetails,
+                $response->getItemName(),
+                $response->getInvoiceSurchargeAmount(),
+                $response->getInvoiceAmountWithSurcharge(),
+                $response->getInvoiceSurchargePercent(),
             );
 
             $this->logger->info('StartPayment entrypoint finished.');
@@ -104,6 +117,8 @@ class StartPayment
                 throw new ApiHttpException($e, 3051);
             } elseif (substr($errorCode, 0, 5) === 'payer') {
                 throw new ApiHttpException($e, 3052);
+            } elseif ($errorCode === 'missingPayerData' || $errorCode === 'incompletePayerData') {
+                throw new ApiHttpException($e, 3056);
             } else {
                 throw new ApiHttpException($e, 3050);
             }

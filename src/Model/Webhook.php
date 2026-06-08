@@ -5,14 +5,13 @@ namespace Drupal\commerce_forumpay\Model;
 use Drupal\commerce_forumpay\Exception\ApiHttpException;
 use Drupal\commerce_forumpay\Exception\ForumPayException;
 use Drupal\commerce_forumpay\Logger\ForumPayLogger;
+use Drupal\commerce_forumpay\Model\Data\WebhookTest;
 use Drupal\commerce_forumpay\Request;
+use Drupal\Component\Utility\Crypt;
 use ForumPay\PaymentGateway\PHPClient\Http\Exception\ApiExceptionInterface;
 use ForumPay\PaymentGateway\PHPClient\Response\CheckPaymentResponse;
 use Drupal\commerce_forumpay\Model\Payment\ForumPay;
 
-/**
- * @inheritdoc
- */
 class Webhook
 {
     /**
@@ -42,11 +41,15 @@ class Webhook
     }
 
     /**
-     * @inheritdoc
-     *
+     * return WebhookTest|null
      */
-    public function execute(Request $request): void
+    public function execute(Request $request): ?WebhookTest
     {
+        try {
+            $request->getRequired('webhook_test');
+            return new WebhookTest(Crypt::hashBase64($this->forumPay->getInstanceIdentifier()));
+        } catch (\InvalidArgumentException $e) { }
+
         try {
             try {
                 $paymentId = $request->getRequired('payment_id');
@@ -59,9 +62,11 @@ class Webhook
             $this->logger->info('Webhook entrypoint called.', ['paymentId' => $paymentId, 'orderId' => $orderId]);
 
             /** @var CheckPaymentResponse $response */
-            $this->forumPay->checkPayment($orderId, $paymentId);
+            $this->forumPay->checkPayment($orderId, $paymentId, true);
 
             $this->logger->info('Webhook entrypoint finished.');
+
+            return null;
         } catch (ApiExceptionInterface $e) {
             $this->logger->logApiException($e);
             throw new ApiHttpException($e, 6050);

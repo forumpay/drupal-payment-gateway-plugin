@@ -10,7 +10,10 @@ use Drupal\commerce_forumpay\Model\CancelPayment;
 use Drupal\commerce_forumpay\Model\CheckPayment;
 use Drupal\commerce_forumpay\Model\GetCurrencyList;
 use Drupal\commerce_forumpay\Model\GetCurrencyRate;
+use Drupal\commerce_forumpay\Model\GetCurrencyRates;
+use Drupal\commerce_forumpay\Model\GetWalletApps;
 use Drupal\commerce_forumpay\Model\Payment\ForumPay;
+use Drupal\commerce_forumpay\Model\Ping;
 use Drupal\commerce_forumpay\Model\RestoreCart;
 use Drupal\commerce_forumpay\Model\StartPayment;
 use Drupal\commerce_forumpay\Model\Webhook;
@@ -60,11 +63,15 @@ class Router
         $this->routes = [
             'currencies' => new GetCurrencyList($this->forumPay, $this->logger),
             'getRate' => new GetCurrencyRate($this->forumPay, $this->logger),
+            'getRates' => new GetCurrencyRates($this->forumPay, $this->logger),
             'startPayment' => new StartPayment($this->forumPay, $this->logger),
             'checkPayment' => new CheckPayment($this->forumPay, $this->logger),
             'cancelPayment' => new CancelPayment($this->forumPay, $this->logger),
+            'ping' => new Ping($this->forumPay, $this->logger),
             'webhook' => new Webhook($this->forumPay, $this->logger),
             'restoreCart' => new RestoreCart($this->forumPay, $this->logger),
+            'syncPayment' => new CheckPayment($this->forumPay, $this->logger),
+            'getWalletApps' => new GetWalletApps($this->forumPay, $this->logger),
         ];
     }
 

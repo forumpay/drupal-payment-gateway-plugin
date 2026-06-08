@@ -19,6 +19,8 @@ use Drupal\commerce_forumpay\Router;
 use Drupal\commerce_forumpay\Exception\ApiHttpException;
 use Drupal\commerce_forumpay\Exception\ForumPayException;
 use Drupal\commerce_forumpay\Exception\ForumPayHttpException;
+use Drupal\commerce_payment\Entity\PaymentGateway;
+use Drupal\Component\Utility\Html;
 
 /**
  * Maps action parameter to the responsible action.
@@ -66,9 +68,19 @@ class ForumpayController extends ControllerBase
         $forumPayLogger->addParser(new PrivateTokenMasker());
 
         $request = new \Drupal\commerce_forumpay\Request();
-        $orderId = $request->get('orderId') ?? $request->getRequired('reference_no');
-        $order = Order::load($orderId);
-        $paymentGateway = $order->payment_gateway->entity;
+
+        $paymentGateway = PaymentGateway::load('forumpay');
+
+        if (!$paymentGateway) {
+            return $this->returnError(
+                new ForumPayHttpException(
+                    'Payment gateway "forumpay" not found.',
+                    0,
+                    ForumPayHttpException::HTTP_BAD_REQUEST
+                )
+            );
+        }
+
         $config = new Config($paymentGateway->get('configuration'));
 
         $forumPay = new ForumPay(
@@ -122,23 +134,38 @@ class ForumpayController extends ControllerBase
         }
 
         $paymentGateway = $order->payment_gateway->entity;
-        $config = $paymentGateway->get('configuration');
+        $config = new Config($paymentGateway->get('configuration'));
+
+        $parsed_url = parse_url($config->getApiUrl());
+        $protocol = $parsed_url['scheme'] ?? null;
+        $host = $parsed_url['host'] ?? null;
+        $forumPayApiUrl = '';
+
+        if ($protocol && $host) {
+            $forumPayApiUrl = $protocol . "://" . $host;
+        }
 
         $apiUrl = Url::fromRoute('commerce_forumpay.apicall', [], ['absolute' => true])->toString();
-        $basePath = Url::fromRoute('<front>', [], ['absolute' => true])->toString();
-
-        $module_handler = \Drupal::service('module_handler');
-        $module_path = $module_handler->getModule('commerce_forumpay')->getPath();
 
         $extraHtml = '<span id="forumpay-apibase" data="' . $apiUrl . '"></span>';
         $extraHtml .= '<span id="forumpay-orderId" data="' . $orderId . '"></span>';
         $extraHtml .= '<span id="forumpay-returnurl" data="' . $return_url . '"></span>';
         $extraHtml .= '<span id="forumpay-cancelurl" data="' . $cancel_url . '"></span>';
+        $extraHtml .= '<span id="forumpay-forumpayapiurl" data="' . $forumPayApiUrl . '"></span>';
+        $extraHtml .= '<span id="forumpay-invoiceamount" data="' . $this->orderManager->getOrderTotal($orderId) . '"></span>';
+        $extraHtml .= '<span id="forumpay-invoicecurrency" data="' . $this->orderManager->getOrderCurrency($orderId) . '"></span>';
 
-        $extraHtml .= '<link rel="stylesheet"  href="' . $basePath . $module_path . '/css/forumpay.css" />';
-        $extraHtml .= '<link rel="stylesheet"  href="' . $basePath . $module_path . '/css/forumpay_widget.css" />';
-        $extraHtml .= '<script type="text/javascript" src="' . $basePath . $module_path . '/js/forumpay_widget.js"></script>';
-        $extraHtml .= '<script type="text/javascript" src="' . $basePath . $module_path . '/js/forumpay.js"></script>';
+        $billing = $order->getBillingProfile()->get('address')->first();
+        $firstName = $billing ? $billing->getGivenName() : '';
+        $lastName = $billing ? $billing->getFamilyName() : '';
+        $company = $billing ? $billing->getOrganization() : '';
+        $country = $billing ? $billing->getCountryCode() : '';
+
+        $extraHtml .= '<span id="forumpay-payerfirstname" data="' . Html::escape($firstName) . '"></span>';
+        $extraHtml .= '<span id="forumpay-payerlastname" data="' . Html::escape($lastName) . '"></span>';
+        $extraHtml .= '<span id="forumpay-payeremail" data="' . Html::escape($order->getEmail()) . '"></span>';
+        $extraHtml .= '<span id="forumpay-payercompany" data="' . Html::escape($company) . '"></span>';
+        $extraHtml .= '<span id="forumpay-payercountry" data="' . Html::escape($country) . '"></span>';
 
         $templateHtml = '<div id="ForumPayPaymentGatewayWidgetContainer">{{message}}</div>' . $extraHtml;
 

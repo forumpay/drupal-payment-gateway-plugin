@@ -1,0 +1,13 @@
+<?php
+
+/**
+ * Implements hook_update_N().
+ */
+function commerce_forumpay_update_10101()
+{
+    $config = \Drupal::configFactory()->getEditable('forumpay.settings');
+    if (!$config->get('installation_id')) {
+        $installation_id = bin2hex(random_bytes(16));
+        $config->set('installation_id', $installation_id)->save();
+    }
+}
