@@ -7,9 +7,10 @@ use Symfony\Component\DependencyInjection\ContainerInterface;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\RedirectResponse;
+use Symfony\Component\HttpKernel\Exception\AccessDeniedHttpException;
+use Symfony\Component\HttpKernel\Exception\BadRequestHttpException;
 use Drupal\Core\Url;
 use Drupal\Core\Controller\ControllerBase;
-use Drupal\commerce_order\Entity\Order;
 use Drupal\commerce_forumpay\Config;
 use Drupal\commerce_forumpay\Logger\ForumPayLogger;
 use Drupal\commerce_forumpay\Logger\PrivateTokenMasker;
@@ -20,7 +21,7 @@ use Drupal\commerce_forumpay\Exception\ApiHttpException;
 use Drupal\commerce_forumpay\Exception\ForumPayException;
 use Drupal\commerce_forumpay\Exception\ForumPayHttpException;
 use Drupal\commerce_payment\Entity\PaymentGateway;
-use Drupal\Component\Utility\Html;
+use Drupal\Component\Utility\UrlHelper;
 
 /**
  * Maps action parameter to the responsible action.
@@ -90,9 +91,11 @@ class ForumpayController extends ControllerBase
         );
 
         try {
-            $router = new Router($forumPay, $forumPayLogger);
+            $router = new Router($forumPay, $this->orderManager, $forumPayLogger);
             $response = $router->execute($request);
         } catch (ApiHttpException $e) {
+            return $this->returnError($e);
+        } catch (ForumPayHttpException $e) {
             return $this->returnError($e);
         } catch (ForumPayException $e) {
             return $this->returnError(
@@ -123,7 +126,23 @@ class ForumpayController extends ControllerBase
         $return_url = $request->request->get('return_url');
         $cancel_url = $request->request->get('cancel_url');
 
-        $order = $this->orderManager->getOrder($orderId);
+        if ($orderId === null || $orderId === ''
+            || $return_url === null || $return_url === ''
+            || $cancel_url === null || $cancel_url === '') {
+            throw new BadRequestHttpException('Missing required parameters.');
+        }
+
+        $return_url = $this->validateRedirectUrl($return_url);
+        $cancel_url = $this->validateRedirectUrl($cancel_url);
+
+        try {
+            $this->orderManager->validateOrderAccess((string) $orderId);
+        }
+        catch (ForumPayHttpException $e) {
+            throw new AccessDeniedHttpException($e->getMessage(), $e);
+        }
+
+        $order = $this->orderManager->getOrder((string) $orderId);
 
         if ($order->getState()->getId() === 'completed') {
             return new RedirectResponse($return_url);
@@ -147,33 +166,74 @@ class ForumpayController extends ControllerBase
 
         $apiUrl = Url::fromRoute('commerce_forumpay.apicall', [], ['absolute' => true])->toString();
 
-        $extraHtml = '<span id="forumpay-apibase" data="' . $apiUrl . '"></span>';
-        $extraHtml .= '<span id="forumpay-orderId" data="' . $orderId . '"></span>';
-        $extraHtml .= '<span id="forumpay-returnurl" data="' . $return_url . '"></span>';
-        $extraHtml .= '<span id="forumpay-cancelurl" data="' . $cancel_url . '"></span>';
-        $extraHtml .= '<span id="forumpay-forumpayapiurl" data="' . $forumPayApiUrl . '"></span>';
-        $extraHtml .= '<span id="forumpay-invoiceamount" data="' . $this->orderManager->getOrderTotal($orderId) . '"></span>';
-        $extraHtml .= '<span id="forumpay-invoicecurrency" data="' . $this->orderManager->getOrderCurrency($orderId) . '"></span>';
-
         $billing = $order->getBillingProfile()->get('address')->first();
         $firstName = $billing ? $billing->getGivenName() : '';
         $lastName = $billing ? $billing->getFamilyName() : '';
         $company = $billing ? $billing->getOrganization() : '';
         $country = $billing ? $billing->getCountryCode() : '';
 
-        $extraHtml .= '<span id="forumpay-payerfirstname" data="' . Html::escape($firstName) . '"></span>';
-        $extraHtml .= '<span id="forumpay-payerlastname" data="' . Html::escape($lastName) . '"></span>';
-        $extraHtml .= '<span id="forumpay-payeremail" data="' . Html::escape($order->getEmail()) . '"></span>';
-        $extraHtml .= '<span id="forumpay-payercompany" data="' . Html::escape($company) . '"></span>';
-        $extraHtml .= '<span id="forumpay-payercountry" data="' . Html::escape($country) . '"></span>';
-
-        $templateHtml = '<div id="ForumPayPaymentGatewayWidgetContainer">{{message}}</div>' . $extraHtml;
-
-        return array(
+        return [
             '#attached' => $attached,
             '#type' => 'inline_template',
-            '#template' => $templateHtml,
-        );
+            '#template' => '<div id="ForumPayPaymentGatewayWidgetContainer">{{ message }}</div>'
+                . '<span id="forumpay-apibase" data="{{ api_url|e(\'html_attr\') }}"></span>'
+                . '<span id="forumpay-orderId" data="{{ order_id|e(\'html_attr\') }}"></span>'
+                . '<span id="forumpay-returnurl" data="{{ return_url|e(\'html_attr\') }}"></span>'
+                . '<span id="forumpay-cancelurl" data="{{ cancel_url|e(\'html_attr\') }}"></span>'
+                . '<span id="forumpay-forumpayapiurl" data="{{ forumpay_api_url|e(\'html_attr\') }}"></span>'
+                . '<span id="forumpay-invoiceamount" data="{{ invoice_amount|e(\'html_attr\') }}"></span>'
+                . '<span id="forumpay-invoicecurrency" data="{{ invoice_currency|e(\'html_attr\') }}"></span>'
+                . '<span id="forumpay-payerfirstname" data="{{ payer_first_name|e(\'html_attr\') }}"></span>'
+                . '<span id="forumpay-payerlastname" data="{{ payer_last_name|e(\'html_attr\') }}"></span>'
+                . '<span id="forumpay-payeremail" data="{{ payer_email|e(\'html_attr\') }}"></span>'
+                . '<span id="forumpay-payercompany" data="{{ payer_company|e(\'html_attr\') }}"></span>'
+                . '<span id="forumpay-payercountry" data="{{ payer_country|e(\'html_attr\') }}"></span>',
+            '#context' => [
+                'message' => '',
+                'api_url' => $apiUrl,
+                'order_id' => $orderId,
+                'return_url' => $return_url,
+                'cancel_url' => $cancel_url,
+                'forumpay_api_url' => $forumPayApiUrl,
+                'invoice_amount' => $this->orderManager->getOrderTotal($orderId),
+                'invoice_currency' => $this->orderManager->getOrderCurrency($orderId),
+                'payer_first_name' => $firstName,
+                'payer_last_name' => $lastName,
+                'payer_email' => $order->getEmail(),
+                'payer_company' => $company,
+                'payer_country' => $country,
+            ],
+        ];
+    }
+
+    /**
+     * Validate that a redirect URL is safe to use.
+     *
+     * @param string $url
+     * @return string
+     * @throws \Symfony\Component\HttpKernel\Exception\BadRequestHttpException
+     */
+    private function validateRedirectUrl(string $url): string
+    {
+        if ($url === '') {
+            throw new BadRequestHttpException('Invalid redirect URL.');
+        }
+
+        if (UrlHelper::isExternal($url)) {
+            if (!UrlHelper::isValid($url, TRUE)) {
+                throw new BadRequestHttpException('Invalid redirect URL.');
+            }
+
+            $base_url = \Drupal::request()->getSchemeAndHttpHost();
+            if (!UrlHelper::externalIsLocal($url, $base_url)) {
+                throw new BadRequestHttpException('Invalid redirect URL.');
+            }
+        }
+        elseif (!UrlHelper::isValid($url)) {
+            throw new BadRequestHttpException('Invalid redirect URL.');
+        }
+
+        return $url;
     }
 
     /**

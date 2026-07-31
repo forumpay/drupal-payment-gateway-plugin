@@ -2,6 +2,8 @@
 
 namespace Drupal\commerce_forumpay;
 
+use Drupal\commerce_forumpay\Exception\ForumPayException;
+
 /**
  * Forumpay Payment Gateway configuration.
  *
@@ -11,6 +13,7 @@ class Config
     public const PRODUCTION_URL = 'https://api.forumpay.com/pay/v2/';
     public const SANDBOX_URL = 'https://sandbox.api.forumpay.com/pay/v2/';
     public const MODULE_NAME = 'commerce_forumpay';
+    public const API_SECRET_MASK = '******';
 
     /**
      * @var array
@@ -103,6 +106,92 @@ class Config
     public function getMerchantApiSecret()
     {
         return $this->configData['api_key'];
+    }
+
+    /**
+     * @return string
+     */
+    public function getApiUrlOverride(): string
+    {
+        return (string) ($this->configData['api_url_override'] ?? '');
+    }
+
+    /** Trim, lowercase, strip trailing slashes. */
+    private function normalizeOverrideUrl(string $url): string
+    {
+        return rtrim(strtolower(trim($url)), '/');
+    }
+
+    /** Production and Sandbox only; custom URLs must use apiUrlOverride. */
+    private function isAllowedApiEnv(string $apiEnv): bool
+    {
+        $normalized = $this->normalizeOverrideUrl($apiEnv);
+
+        foreach ([self::PRODUCTION_URL, self::SANDBOX_URL] as $allowed) {
+            if ($this->normalizeOverrideUrl($allowed) === $normalized) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /** Treat ****** as not provided. */
+    public static function normalizePostedSecret(string $secret): string
+    {
+        $secret = trim($secret);
+
+        return $secret === self::API_SECRET_MASK ? '' : $secret;
+    }
+
+    /** True when api env or override differs from the saved value (including cleared). */
+    public function requiresExplicitSecret(string $requestedApiEnv, string $requestedOverride): bool
+    {
+        $overrideChanged =
+            $this->normalizeOverrideUrl($requestedOverride) !== $this->normalizeOverrideUrl($this->getApiUrlOverride());
+
+        $envChanged =
+            $this->normalizeOverrideUrl($requestedApiEnv) !== $this->normalizeOverrideUrl($this->getPaymentMode());
+
+        return $overrideChanged || $envChanged;
+    }
+
+    /**
+     * @return array{apiUser: string, apiSecret: string}
+     * @throws ForumPayException
+     */
+    public function resolveCredentials(
+        string $apiEnv,
+        string $requestedOverride,
+        string $requestedUser,
+        string $requestedSecret
+    ): array {
+        if (!$this->isAllowedApiEnv($apiEnv)) {
+            throw new ForumPayException('Invalid API environment URL.');
+        }
+
+        $requestedUser = trim($requestedUser);
+        $rawSecret = trim($requestedSecret);
+        $isMask = $rawSecret === self::API_SECRET_MASK;
+
+        if ($requestedUser === '') {
+            throw new ForumPayException('API User is required.');
+        }
+        if ($this->requiresExplicitSecret($apiEnv, $requestedOverride) && ($rawSecret === '' || $isMask)) {
+            throw new ForumPayException(
+                'Enter your API Secret to change the API environment.'
+            );
+        }
+        if ($rawSecret === '') {
+            throw new ForumPayException('API Secret is required.');
+        }
+
+        $apiSecret = $isMask ? (string) $this->getMerchantApiSecret() : $rawSecret;
+        if ($apiSecret === '') {
+            throw new ForumPayException('API Secret is required.');
+        }
+
+        return ['apiUser' => $requestedUser, 'apiSecret' => $apiSecret];
     }
 
     /**

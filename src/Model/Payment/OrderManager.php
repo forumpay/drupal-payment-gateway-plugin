@@ -2,6 +2,9 @@
 
 namespace Drupal\commerce_forumpay\Model\Payment;
 
+use Drupal\commerce_cart\CartSessionInterface;
+use Drupal\commerce_forumpay\Exception\ForumPayHttpException;
+use Drupal\commerce_forumpay\Request;
 use Drupal\commerce_price\Price;
 use Drupal\commerce_order\Adjustment;
 use Drupal\commerce_order\Entity\Order;
@@ -16,9 +19,9 @@ class OrderManager
      * Get order by order id from db
      *
      * @param string $orderId
-     * @return Order
+     * @return Order|null
      */
-    public function getOrder(string $orderId): Order
+    public function getOrder(string $orderId): ?Order
     {
         return Order::load($orderId);
     }
@@ -284,5 +287,136 @@ class OrderManager
         }
 
         return [];
+    }
+
+    /**
+     * Resolve order ID from request.
+     *
+     * @param \Drupal\commerce_forumpay\Request $request
+     * @return string
+     * @throws \Drupal\commerce_forumpay\Exception\ForumPayHttpException
+     */
+    public function resolveOrderId(Request $request): string
+    {
+        $orderId = $request->get('orderId');
+        if ($orderId !== null && $orderId !== '') {
+            return (string) $orderId;
+        }
+
+        throw $this->accessDeniedOrder();
+    }
+
+    /**
+     * Validate that the current user has admin access.
+     *
+     * @throws \Drupal\commerce_forumpay\Exception\ForumPayHttpException
+     */
+    public function validateAdminAccess(): void
+    {
+        $account = \Drupal::currentUser();
+        if ($account->hasPermission('administer commerce_order')
+            || $account->hasPermission('administer commerce_payment_gateway')) {
+            return;
+        }
+
+        throw new ForumPayHttpException(
+            'Access denied. Admin privileges required.',
+            4003,
+            ForumPayHttpException::HTTP_FORBIDDEN
+        );
+    }
+
+    /**
+     * Validate that the current user/session has access to the given order.
+     *
+     * @param string $orderId
+     * @throws \Drupal\commerce_forumpay\Exception\ForumPayHttpException
+     */
+    public function validateOrderAccess(string $orderId): void
+    {
+        $account = \Drupal::currentUser();
+
+        $order = $this->getOrder($orderId);
+        if (!$order) {
+            throw $this->accessDeniedOrder();
+        }
+
+        if ($account->hasPermission('administer commerce_order')) {
+            return;
+        }
+
+        $currentUserId = (int) $account->id();
+        $orderCustomerId = (int) $order->getCustomerId();
+
+        if ($currentUserId > 0 && $currentUserId === $orderCustomerId) {
+            return;
+        }
+
+        if ($currentUserId === 0) {
+            /** @var \Drupal\commerce_cart\CartSessionInterface $cartSession */
+            $cartSession = \Drupal::service('commerce_cart.cart_session');
+            $orderIdInt = (int) $orderId;
+            if ($cartSession->hasCartId($orderIdInt, CartSessionInterface::ACTIVE)
+                || $cartSession->hasCartId($orderIdInt, CartSessionInterface::COMPLETED)) {
+                return;
+            }
+        }
+
+        throw $this->accessDeniedOrder();
+    }
+
+    /**
+     * Validate that the payment belongs to the given order.
+     *
+     * @param string $orderId
+     * @param string $paymentId
+     * @throws \Drupal\commerce_forumpay\Exception\ForumPayHttpException
+     */
+    public function validatePaymentBelongsToOrder(string $orderId, string $paymentId): void
+    {
+        $this->getPaymentMetaData($orderId, $paymentId);
+    }
+
+    /**
+     * Get startPayment metadata for the given order/payment pair.
+     *
+     * @param string $orderId
+     * @param string $paymentId
+     * @return array
+     * @throws \Drupal\commerce_forumpay\Exception\ForumPayHttpException
+     */
+    public function getPaymentMetaData(string $orderId, string $paymentId): array
+    {
+        $startPaymentResponses = $this->getOrderMetaData($orderId, 'startPayment');
+
+        foreach ($startPaymentResponses as $value) {
+            if (!is_array($value) || ($value['payment_id'] ?? null) !== $paymentId) {
+                continue;
+            }
+
+            $currency = $value['currency'] ?? null;
+            $address = $value['address'] ?? null;
+            if ($currency === null || $currency === '' || $address === null || $address === '') {
+                throw $this->accessDeniedOrder();
+            }
+
+            return $value;
+        }
+
+        throw $this->accessDeniedOrder();
+    }
+
+    /**
+     * Access-denied error for order-scoped requests.
+     *
+     * @return \Drupal\commerce_forumpay\Exception\ForumPayHttpException
+     */
+    private function accessDeniedOrder(): ForumPayHttpException
+    {
+        return new ForumPayHttpException(
+            'Access denied. You do not have permission to access this order.',
+            4003,
+            ForumPayHttpException::HTTP_FORBIDDEN
+        );
     }
 }

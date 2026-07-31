@@ -22,11 +22,6 @@ use Drupal\Core\Render\Markup;
  */
 class ForumPayRedirect extends OffsitePaymentGatewayBase {
     /**
-     * @var string null
-     */
-    private $oldApiKey = null;
-
-    /**
      * {@inheritdoc}
      */
     public function defaultConfiguration() {
@@ -63,10 +58,12 @@ class ForumPayRedirect extends OffsitePaymentGatewayBase {
             ],
         ];
 
+        $hasStoredApiKey = !empty($this->configuration['api_key']);
+
         $form['api_user'] = [
             '#type' => 'textfield',
             '#title' => $this->t('API User'),
-            '#default_value' => $this->configuration['api_user'],
+            '#default_value' => $this->configuration['api_user'] ?? '',
             '#description' => $this->t('You can generate API key in your ForumPay Account.'),
             '#required' => TRUE,
         ];
@@ -74,11 +71,12 @@ class ForumPayRedirect extends OffsitePaymentGatewayBase {
         $form['api_key'] = [
             '#type' => 'password',
             '#title' => $this->t('API Secret'),
-            '#default_value' => $this->configuration['api_key'],
-            '#placeholder' => '*****',
+            '#default_value' => $hasStoredApiKey ? Config::API_SECRET_MASK : '',
             '#description' => $this->t('You can generate API secret in your ForumPay Account.'),
-            '#required' => (bool) $form_state->get('oldApiKey'),
-            '#always_empty' => FALSE,
+            '#required' => TRUE,
+            '#attributes' => $hasStoredApiKey
+                ? ['value' => Config::API_SECRET_MASK]
+                : [],
         ];
 
         $form['pos_id'] = [
@@ -250,7 +248,6 @@ class ForumPayRedirect extends OffsitePaymentGatewayBase {
         ];
 
         $form['mode']['#access'] = FALSE;
-        $form_state->set('oldApiKey', $this->configuration['api_key']);
 
         return $form;
     }
@@ -268,9 +265,32 @@ class ForumPayRedirect extends OffsitePaymentGatewayBase {
             );
         }
 
-        $apiKey = trim($values['api_key']);
+        $apiUser = trim((string) ($values['api_user'] ?? ''));
+        $rawSecret = trim((string) ($values['api_key'] ?? ''));
+        $apiEnv = (string) ($values['api_url'] ?? '');
+        $apiUrlOverride = trim((string) ($values['api_url_override'] ?? ''));
+        $hasStoredApiKey = !empty($this->configuration['api_key']);
 
-        if (!$this->configuration['api_key'] && !$apiKey) {
+        if ($apiUser === '') {
+            $form_state->setErrorByName('api_user',
+                $this->t('API User field is required.')
+            );
+        }
+
+        $config = new Config($this->configuration);
+        $overrideRequiresSecret = $config->requiresExplicitSecret($apiEnv, $apiUrlOverride);
+
+        if ($overrideRequiresSecret && ($rawSecret === '' || $rawSecret === Config::API_SECRET_MASK)) {
+            $form_state->setErrorByName('api_key',
+                $this->t('Enter your API Secret to change the API environment.')
+            );
+        }
+        elseif ($rawSecret === '') {
+            $form_state->setErrorByName('api_key',
+                $this->t('API Secret field is required.')
+            );
+        }
+        elseif ($rawSecret === Config::API_SECRET_MASK && !$hasStoredApiKey) {
             $form_state->setErrorByName('api_key',
                 $this->t('API Secret field is required.')
             );
@@ -322,7 +342,6 @@ class ForumPayRedirect extends OffsitePaymentGatewayBase {
         $values = $form_state->getValue($form['#parents']);
         $keys = [
             'api_url',
-            'api_user',
             'api_url_override',
             'pos_id',
             'success_order_state',
@@ -340,14 +359,15 @@ class ForumPayRedirect extends OffsitePaymentGatewayBase {
             'network_processing_fee_paid_by',
         ];
 
-        $newApiKey = trim($values['api_key']);
-        $existingApiKey = $form_state->get('oldApiKey');
+        $newApiUser = trim((string) ($values['api_user'] ?? ''));
+        $newApiKey = Config::normalizePostedSecret((string) ($values['api_key'] ?? ''));
 
-        if (!empty($newApiKey) && (empty($existingApiKey) || $newApiKey !== $existingApiKey)) {
+        $this->configuration['api_user'] = $newApiUser;
+
+        if ($newApiKey !== '') {
             $this->configuration['api_key'] = $newApiKey;
-        } else {
-            $this->configuration['api_key'] = $existingApiKey;
         }
+        // Empty / mask: keep the already-stored secret on $this->configuration['api_key'].
 
         if (!$values['accept_underpayment_main']) {
             $values['accept_underpayment_threshold'] = '';

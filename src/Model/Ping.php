@@ -48,14 +48,15 @@ class Ping
 
             try {
                 $apiEnv = $request->getRequired('apiEnv');
-                $apiKey = $request->getRequired('apiKey');
-                $apiSecret = $request->getRequired('apiSecret');
                 $apiUrlOverride = $request->getRequired('apiUrlOverride');
                 $webhookUrl = $request->getRequired('webhookUrl');
             } catch (\InvalidArgumentException $e) {
                 $this->logger->error($e->getMessage(), $e->getTrace());
                 throw new ForumPayException('There has been an error, check Drupal logs for more.');
             }
+
+            $apiKey = (string) $request->get('apiKey', '');
+            $apiSecret = (string) $request->get('apiSecret', '');
 
             $response = $this->forumPay->ping($apiEnv, $apiKey, $apiSecret, $apiUrlOverride, $webhookUrl);
             $this->logger->debug('Ping response.', ['response' => $response->toArray()]);
@@ -64,12 +65,17 @@ class Ping
             $webhookPingResult = $response->getWebhookResult();
 
             if ($webhookPingResult) {
+                $decoded = json_decode($webhookPingResult['response_body'] ?? '');
+                $responseBody = (is_object($decoded) && isset($decoded->message))
+                    ? $decoded->message
+                    : ($webhookPingResult['response_body'] ?? null);
+
                 $webhookPing = new WebhookPingResponse(
                     $webhookPingResult['status'],
                     $webhookPingResult['duration'],
                     $webhookPingResult['webhook_url'],
                     $webhookPingResult['response_code'],
-                    json_decode($webhookPingResult['response_body'])->message ?? $webhookPingResult['response_body'],
+                    $responseBody,
                 );
 
                 $webhookSuccess = $webhookPingResult['status'] === 'ok'
@@ -84,6 +90,9 @@ class Ping
 
             return new \Drupal\commerce_forumpay\Model\Data\Ping('OK');
 
+        } catch (ForumPayException $e) {
+            $this->logger->error($e->getMessage(), $e->getTrace());
+            throw $e;
         } catch (InvalidApiResponseException $e) {
             $this->logger->logApiException($e);
             throw new ForumPayHttpException($e->getMessage(), intval(0));

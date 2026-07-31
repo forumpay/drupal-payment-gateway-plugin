@@ -77,7 +77,7 @@ class Ping
         return [
             'message' => $this->message,
             'webhookSuccess' => $this->webhookSuccess,
-            'webhookPingResponse' => $this->webhookPingResponse->toArray() ?? $this->webhookPingResponse,
+            'webhookPingResponse' => $this->webhookPingResponse?->toArray(),
         ];
     }
 }

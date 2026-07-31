@@ -9,6 +9,53 @@ jQuery(document).ready(function($) {
   $('.padding-left-1-6-em').css('padding-left', '1.6em');
   $('#drupal_forumpay_api_test').css('margin', 0);
 
+  const SECRET_MASK = '******';
+  const $apiEnv = $('#edit-configuration-forumpay-api-url');
+  const $override = $('#edit-configuration-forumpay-api-url-override');
+  const $secret = $('#edit-configuration-forumpay-api-key');
+  const $test = $('#drupal_forumpay_api_test');
+  const normalizeUrl = (url) => (url || '').trim().replace(/\/+$/, '').toLowerCase();
+  const savedApiEnv = normalizeUrl($apiEnv.val());
+  const savedOverride = normalizeUrl($override.val());
+  const $envChangeNotice = $('<p class="description form-item__description" style="display:none; color:#d63638;"></p>');
+  $secret.closest('.form-item, .js-form-item').append($envChangeNotice);
+
+  function envOrOverrideChanged() {
+    return normalizeUrl($apiEnv.val()) !== savedApiEnv
+      || normalizeUrl($override.val()) !== savedOverride;
+  }
+
+  function envChangeRequiresSecret() {
+    if (!envOrOverrideChanged()) {
+      return false;
+    }
+    const secretVal = ($secret.val() || '').trim();
+    return secretVal === '' || secretVal === SECRET_MASK;
+  }
+
+  function syncEnvChangeUi() {
+    const needsSecret = envChangeRequiresSecret();
+    $envChangeNotice.text(needsSecret
+      ? 'Enter your API Secret to change the API environment.'
+      : ''
+    ).toggle(needsSecret);
+    $test.prop('disabled', needsSecret);
+  }
+
+  $apiEnv.on('change', syncEnvChangeUi);
+  $override.on('change input', syncEnvChangeUi);
+  $secret.on('input change', syncEnvChangeUi);
+  $override.closest('form').on('submit', function (e) {
+    if (!envChangeRequiresSecret()) {
+      return;
+    }
+    e.preventDefault();
+    syncEnvChangeUi();
+    $secret.focus();
+    return false;
+  });
+  syncEnvChangeUi();
+
   const fields = [
     'accept-underpayment',
     'accept-overpayment',
@@ -100,6 +147,12 @@ jQuery(document).ready(function($) {
   $('#drupal_forumpay_api_test').on('click', function(e) {
     e.preventDefault();
 
+    if (envChangeRequiresSecret()) {
+      syncEnvChangeUi();
+      $secret.focus();
+      return;
+    }
+
     var $button = $(this);
     var originalText = $button.text();
     $button.prop('disabled', true);
@@ -121,6 +174,7 @@ jQuery(document).ready(function($) {
       success: function(response) {
         $button.prop('disabled', false);
         $button.text(originalText);
+        syncEnvChangeUi();
 
         const {webhookSuccess, webhookPingResponse, message} = response || {};
         const {status, duration, webhookUrl, responseCode, responseBody} = webhookPingResponse || {};
@@ -146,6 +200,7 @@ jQuery(document).ready(function($) {
         error: function(error) {
           $button.prop('disabled', false);
           $button.text(originalText);
+          syncEnvChangeUi();
           const now = new Date();
 
           // Extract the UTC components

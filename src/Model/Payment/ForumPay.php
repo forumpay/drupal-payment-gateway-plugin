@@ -93,14 +93,17 @@ class ForumPay
         string $webhookUrl
     ): PingResponse
     {
-        if (!$apiSecret) {
-            $apiSecret = $this->config->getMerchantApiSecret();
+        $apiUrl = trim($apiUrlOverride !== '' ? $apiUrlOverride : $apiEnv);
+        if ($apiUrl === '' || filter_var($apiUrl, FILTER_VALIDATE_URL) === false) {
+            throw new ForumPayException('Invalid API environment URL.');
         }
 
+        $credentials = $this->config->resolveCredentials($apiEnv, $apiUrlOverride, $apiKey, $apiSecret);
+
         return $this->initApiClient(
-            $apiUrlOverride ?: $apiEnv,
-            $apiKey,
-            $apiSecret,
+            $apiUrl,
+            $credentials['apiUser'],
+            $credentials['apiSecret'],
         )->ping($webhookUrl);
     }
 
@@ -132,11 +135,6 @@ class ForumPay
      */
     public function getRate(string $orderId, string $currency): GetRateResponse
     {
-        $order = $this->orderManager->getOrder($orderId);
-        if (!$order) {
-            throw new \Exception("Order is not active. Order is already created.");
-        }
-
         return $this->apiClient->getRate(
             $this->config->getPosId(),
             $this->orderManager->getOrderCurrency($orderId),
@@ -159,11 +157,6 @@ class ForumPay
      */
     public function getRates(string $orderId, string $currencies)
     {
-        $order = $this->orderManager->getOrder($orderId);
-        if (!$order) {
-            throw new \Exception("Order is not active. Order is already created.");
-        }
-
         return $this->apiClient->getRates(
             $this->config->getPosId(),
             $this->orderManager->getOrderCurrency($orderId),
