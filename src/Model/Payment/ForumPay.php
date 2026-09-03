@@ -346,17 +346,24 @@ class ForumPay
 
             if (
                 $existingPayment->getPaymentId() === $existingPaymentId
+                || $existingPayment->getPosId() !== $this->config->getPosId()
                 || strtolower($existingPayment->getStatus()) !== 'waiting'
             ) {
                 //newly created
                 continue;
             }
 
-            $this->cancelPayment(
-                $existingPayment->getPaymentId(),
-                $existingPayment->getCurrency(),
-                $existingPayment->getAddress()
-            );
+            try {
+                $this->cancelPayment(
+                    $existingPayment->getPaymentId(),
+                    $existingPayment->getCurrency(),
+                    $existingPayment->getAddress()
+                );
+            } catch (ApiExceptionInterface $e) {
+                if (stripos($e->getMessage(), 'Payment not found') === false) {
+                    throw $e;
+                }
+            }
         }
     }
 
